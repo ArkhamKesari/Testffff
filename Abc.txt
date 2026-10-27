@@ -1,0 +1,708 @@
+(function () {
+    // FIRST RUN: true = preview only.
+    // AFTER reviewing the output: false = save changes.
+    var DRY_RUN = true;
+
+    var C = {
+        user: 'john.dave',
+        manager: 'suyash.sherwal',
+        territory: 'TER0001540',
+        account: 'Bosch Demo Customer',
+        group: 'STM Dashboard Sales Team',
+
+        // Creates a demo user so John's Direct Reports section has an entry.
+        report: 'neha.dashboard.demo',
+
+        memberRole: 'Account Executive',
+        accountType: 'Account Manager',
+        accountResponsibility: 'Account Manager'
+    };
+
+    var made = 0;
+    var changed = 0;
+    var reused = 0;
+    var skipped = 0;
+    var serial = 0;
+
+    function log(message) {
+        gs.print('[JOHN SETUP] ' + message);
+    }
+
+    function own(object, key) {
+        return Object.prototype.hasOwnProperty.call(object, key);
+    }
+
+    function table(name) {
+        var gr = new GlideRecordSecure(name);
+
+        if (!gr.isValid())
+            throw new Error('Table unavailable: ' + name);
+
+        return gr;
+    }
+
+    function field(gr, name) {
+        if (!gr.isValidField(name))
+            throw new Error('Missing field: ' + name);
+    }
+
+    // Find exactly one matching record.
+    // Stop if a lookup is ambiguous.
+    function find(tableName, keys, required) {
+        var gr = table(tableName);
+        var virtual = false;
+        var key;
+
+        for (key in keys) {
+            if (!own(keys, key))
+                continue;
+
+            field(gr, key);
+
+            if (String(keys[key]).indexOf('PREVIEW:') === 0)
+                virtual = true;
+
+            gr.addQuery(key, keys[key]);
+        }
+
+        // A dependent record planned during preview does not exist yet.
+        if (virtual)
+            return null;
+
+        gr.setLimit(2);
+        gr.query();
+
+        var ids = [];
+
+        while (gr.next())
+            ids.push(String(gr.getUniqueValue()));
+
+        if (ids.length > 1) {
+            throw new Error(
+                'Ambiguous match: ' + tableName + ' ' +
+                JSON.stringify(keys)
+            );
+        }
+
+        if (!ids.length) {
+            if (required) {
+                throw new Error(
+                    'Record not found/readable: ' + tableName + ' ' +
+                    JSON.stringify(keys)
+                );
+            }
+
+            return null;
+        }
+
+        var result = table(tableName);
+
+        if (!result.get(ids[0]))
+            throw new Error('Record became unavailable: ' + tableName);
+
+        return result;
+    }
+
+    function uid(gr) {
+        return String(gr.getUniqueValue());
+    }
+
+    // Resolve a reference by its display label.
+    function displayRecord(tableName, label) {
+        var gr = table(tableName);
+        var matches = [];
+        var count = 0;
+
+        gr.orderBy('sys_id');
+        gr.setLimit(5001);
+        gr.query();
+
+        while (gr.next()) {
+            if (++count > 5000)
+                throw new Error('Reference scan limit: ' + tableName);
+
+            if (String(gr.getDisplayValue()) === label)
+                matches.push(uid(gr));
+        }
+
+        if (matches.length !== 1) {
+            throw new Error(
+                'Expected one ' + tableName + ' named "' +
+                label + '", found ' + matches.length
+            );
+        }
+
+        return find(tableName, {sys_id: matches[0]}, true);
+    }
+
+    // Resolve actual stored choice values from this instance.
+    function choice(tableName, element, label) {
+        var gr = table('sys_choice');
+        var values = {};
+        var list = [];
+
+        gr.addQuery('name', tableName);
+        gr.addQuery('element', element);
+        gr.addQuery('language', 'en');
+        gr.addQuery('inactive', false);
+        gr.query();
+
+        while (gr.next()) {
+            if (
+                String(gr.getValue('label')).toLowerCase() ===
+                label.toLowerCase()
+            ) {
+                var value = String(gr.getValue('value'));
+
+                if (!values[value]) {
+                    values[value] = true;
+                    list.push(value);
+                }
+            }
+        }
+
+        if (list.length !== 1) {
+            throw new Error(
+                'Cannot uniquely resolve choice ' +
+                tableName + '.' + element + ': ' + label
+            );
+        }
+
+        return list[0];
+    }
+
+    function setValues(gr, values) {
+        for (var key in values) {
+            if (!own(values, key))
+                continue;
+
+            field(gr, key);
+
+            if (!gr.getElement(key).canWrite())
+                throw new Error('Field not writable: ' + key);
+
+            gr.setValue(key, values[key]);
+        }
+    }
+
+    // Reload after saving to confirm the intended values persisted.
+    function verify(tableName, id, values) {
+        var gr = find(tableName, {sys_id: id}, true);
+
+        for (var key in values) {
+            if (!own(values, key))
+                continue;
+
+            var actual = String(gr.getValue(key) || '');
+            var expected = String(values[key]);
+
+            if (expected === 'true' && actual === '1')
+                actual = 'true';
+
+            if (expected === 'false' && actual === '0')
+                actual = 'false';
+
+            if (actual !== expected) {
+                throw new Error(
+                    'Saved value differs: ' + tableName + '.' +
+                    key + '; inspect record ' + id
+                );
+            }
+        }
+    }
+
+    // Reuse an existing record, otherwise create it.
+    // Existing relationship attributes and dates are preserved.
+    function ensure(tableName, keys, defaults, label) {
+        var existing = find(tableName, keys, false);
+
+        if (existing) {
+            reused++;
+            log('REUSE ' + label + ' [' + uid(existing) + ']');
+            return uid(existing);
+        }
+
+        var gr = table(tableName);
+        gr.initialize();
+
+        var values = {};
+        var key;
+
+        for (key in defaults) {
+            if (own(defaults, key))
+                values[key] = defaults[key];
+        }
+
+        for (key in keys) {
+            if (own(keys, key))
+                values[key] = keys[key];
+        }
+
+        for (key in values) {
+            if (own(values, key))
+                field(gr, key);
+        }
+
+        log(
+            (DRY_RUN ? 'WOULD CREATE ' : 'CREATE ') +
+            label + ' ' + JSON.stringify(values)
+        );
+
+        if (DRY_RUN) {
+            made++;
+            return 'PREVIEW:' + (++serial);
+        }
+
+        if (!gr.canCreate())
+            throw new Error('Create denied: ' + tableName);
+
+        setValues(gr, values);
+
+        var id = gr.insert();
+
+        if (!id) {
+            throw new Error(
+                'Insert rejected: ' + tableName + ' ' +
+                gr.getLastErrorMessage()
+            );
+        }
+
+        made++;
+        verify(tableName, String(id), values);
+
+        return String(id);
+    }
+
+    // Update only explicitly requested fields.
+    function update(tableName, id, values, label) {
+        if (String(id).indexOf('PREVIEW:') === 0)
+            return;
+
+        var gr = find(tableName, {sys_id: id}, true);
+        var delta = {};
+        var needsUpdate = false;
+
+        for (var key in values) {
+            if (!own(values, key))
+                continue;
+
+            field(gr, key);
+
+            if (
+                String(gr.getValue(key) || '') !==
+                String(values[key])
+            ) {
+                needsUpdate = true;
+                delta[key] = values[key];
+
+                log(
+                    (DRY_RUN ? 'WOULD CHANGE ' : 'CHANGE ') +
+                    label + '.' + key +
+                    ' FROM "' + gr.getDisplayValue(key) + '"' +
+                    ' [' + gr.getValue(key) + ']' +
+                    ' TO [' + values[key] + ']'
+                );
+            }
+        }
+
+        if (!needsUpdate) {
+            log('UNCHANGED ' + label);
+            return;
+        }
+
+        if (DRY_RUN) {
+            changed++;
+            return;
+        }
+
+        if (!gr.canWrite())
+            throw new Error('Update denied: ' + tableName);
+
+        setValues(gr, delta);
+
+        if (!gr.update()) {
+            throw new Error(
+                'Update rejected: ' + tableName + ' ' +
+                gr.getLastErrorMessage()
+            );
+        }
+
+        changed++;
+        verify(tableName, id, delta);
+    }
+
+    // Prevent a circular reporting hierarchy.
+    function noCycle(start, forbidden) {
+        var seen = {};
+        var id = start;
+        var depth = 0;
+
+        while (id) {
+            if (id === forbidden || seen[id])
+                throw new Error('Reporting hierarchy cycle detected');
+
+            if (++depth > 50)
+                throw new Error('Reporting chain exceeds validation limit');
+
+            seen[id] = true;
+
+            var gr = find('sys_user', {sys_id: id}, true);
+
+            if (!gr.getElement('manager').canRead())
+                throw new Error('Cannot validate manager chain');
+
+            id = String(gr.getValue('manager') || '');
+        }
+    }
+
+    function skip(message) {
+        skipped++;
+        log('SKIP ' + message);
+    }
+
+    try {
+        if (!gs.hasRole('admin'))
+            throw new Error('Run as an administrator');
+
+        log(DRY_RUN ? 'PREVIEW ONLY - NO WRITES' : 'APPLY MODE');
+
+        // A. Resolve required existing records before making changes.
+        var john = uid(find(
+            'sys_user', {user_name: C.user}, true
+        ));
+
+        var boss = uid(find(
+            'sys_user', {user_name: C.manager}, true
+        ));
+
+        var territoryRecord = find(
+            'sn_tp_territory', {number: C.territory}, true
+        );
+
+        var territory = uid(territoryRecord);
+
+        var account = uid(find(
+            'customer_account', {name: C.account}, true
+        ));
+
+        var managerRole = uid(find(
+            'sys_user_role',
+            {name: 'sn_sales_territory.sales_territory_manager'},
+            true
+        ));
+
+        var memberRole = uid(find(
+            'sys_user_role',
+            {name: 'sn_sales_territory.sales_territory_member'},
+            true
+        ));
+
+        var businessRole = uid(displayRecord(
+            'sn_customerservice_related_party_configuration',
+            C.memberRole
+        ));
+
+        var primary = choice(
+            'sn_tp_territory_membership_override',
+            'membershiptype',
+            'Primary'
+        );
+
+        var groupPrimary = choice(
+            'sn_tp_territory_group',
+            'membershiptype',
+            'Primary'
+        );
+
+        var managerType = choice(
+            'sn_tp_territory_manager',
+            'manager_type',
+            'Territory manager'
+        );
+
+        noCycle(boss, john);
+
+        var existingReport = find(
+            'sys_user', {user_name: C.report}, false
+        );
+
+        if (existingReport) {
+            noCycle(john, uid(existingReport));
+            noCycle(boss, uid(existingReport));
+        }
+
+        log(
+            'Territory resolved: ' +
+            territoryRecord.getDisplayValue() +
+            ' [' + territory + ']'
+        );
+
+        // B. Security role.
+        ensure(
+            'sys_user_has_role',
+            {user: john, role: managerRole},
+            {},
+            'John sales territory manager role'
+        );
+
+        // C. Group and group membership.
+        var group = ensure(
+            'sys_user_group',
+            {name: C.group},
+            {
+                description: 'Demo group for the User Dashboard',
+                manager: boss
+            },
+            'Sales team group'
+        );
+
+        update(
+            'sys_user_group', group,
+            {manager: boss},
+            'Group manager'
+        );
+
+        ensure(
+            'sys_user_grmember',
+            {user: john, group: group},
+            {},
+            'John group membership'
+        );
+
+        ensure(
+            'sys_group_has_role',
+            {group: group, role: memberRole},
+            {},
+            'Group sales territory member role'
+        );
+
+        // D. Reporting hierarchy.
+        update(
+            'sys_user', john,
+            {manager: boss},
+            'John reporting manager'
+        );
+
+        // E. Direct report.
+        var report = ensure(
+            'sys_user',
+            {user_name: C.report},
+            {
+                first_name: 'Neha',
+                last_name: 'Dashboard Demo',
+                title: 'Sales Executive',
+                active: 'true',
+                manager: john
+            },
+            'Demo direct report'
+        );
+
+        update(
+            'sys_user', report,
+            {manager: john},
+            'Neha reporting manager'
+        );
+
+        // New territory records get a one-year date range.
+        var now = new GlideDateTime();
+        var end = new GlideDateTime();
+        end.addDaysUTC(365);
+
+        // F. Direct territory membership.
+        var membership = ensure(
+            'sn_tp_territory_membership_override',
+            {user: john, territory: territory},
+            {
+                membershiptype: primary,
+                active: 'true',
+                from: now.getValue(),
+                to: end.getValue()
+            },
+            'Direct territory membership'
+        );
+
+        // G. Territory membership business role.
+        var responsibility = ensure(
+            'sn_tp_crm_extn_territory_membership_responsibility',
+            {
+                territory_membership: membership,
+                member_role: businessRole
+            },
+            {},
+            'Account Executive territory member role'
+        );
+
+        if (String(responsibility).indexOf('PREVIEW:') !== 0) {
+            var rr = find(
+                'sn_tp_crm_extn_territory_membership_responsibility',
+                {sys_id: responsibility},
+                true
+            );
+
+            log(
+                'Stored territory responsibility: ' +
+                (
+                    rr.getDisplayValue('responsibility') ||
+                    '(empty; no definition invented)'
+                )
+            );
+        }
+
+        // H. Territory manager assignment.
+        ensure(
+            'sn_tp_territory_manager',
+            {manager: john, territory: territory},
+            {
+                manager_type: managerType,
+                primary: 'false',
+                from: now.getDate().getValue(),
+                to: end.getDate().getValue()
+            },
+            'Territory manager assignment'
+        );
+
+        // I. Territory linked through the group.
+        ensure(
+            'sn_tp_territory_group',
+            {group: group, territory: territory},
+            {
+                membershiptype: groupPrimary,
+                active: 'true'
+            },
+            'Group territory link'
+        );
+
+        // J. Hierarchy is read from the territory's existing parents.
+        log(
+            'Territory hierarchy uses existing parent links; ' +
+            'no hierarchy changes.'
+        );
+
+        // K. Optional account-team assignment.
+        try {
+            var contributor = find(
+                'sys_user_role',
+                {name: 'sn_customerservice.relationship_contributor'},
+                false
+            );
+
+            if (!contributor) {
+                skip(
+                    'Account-team creation: relationship_contributor ' +
+                    'role is absent. Existing entries remain.'
+                );
+            } else {
+                var accountType = uid(displayRecord(
+                    'sn_customerservice_related_party_configuration',
+                    C.accountType
+                ));
+
+                var definition = displayRecord(
+                    'sn_customerservice_responsibility_def',
+                    C.accountResponsibility
+                );
+
+                var definitionId = uid(definition);
+
+                var team = find(
+                    'sn_customerservice_team_member',
+                    {
+                        account: account,
+                        user: john,
+                        type: accountType,
+                        responsibility: definitionId
+                    },
+                    false
+                );
+
+                if (team) {
+                    reused++;
+                    log('REUSE account-team entry [' + uid(team) + ']');
+                } else {
+                    if (
+                        definition.isValidField('unique') &&
+                        (
+                            definition.getValue('unique') === '1' ||
+                            definition.getValue('unique') === 'true'
+                        )
+                    ) {
+                        if (find(
+                            'sn_customerservice_team_member',
+                            {
+                                account: account,
+                                responsibility: definitionId
+                            },
+                            false
+                        )) {
+                            throw new Error(
+                                'Unique account responsibility already ' +
+                                'assigned; existing team preserved'
+                            );
+                        }
+                    }
+
+                    ensure(
+                        'sys_user_has_role',
+                        {user: john, role: uid(contributor)},
+                        {},
+                        'CSM contributor role'
+                    );
+
+                    ensure(
+                        'sn_customerservice_team_member',
+                        {
+                            account: account,
+                            user: john,
+                            type: accountType,
+                            responsibility: definitionId
+                        },
+                        {order: '100'},
+                        'John account-team entry'
+                    );
+                }
+            }
+        } catch (teamError) {
+            skip('Account-team setup: ' + String(teamError));
+        }
+
+        // L. Account ownership.
+        update(
+            'customer_account', account,
+            {sales_owner: john},
+            'Bosch Demo Customer sales owner'
+        );
+
+        log(
+            'Existing account primary territory and ' +
+            'assignment rules are preserved.'
+        );
+
+        log(
+            'FINISHED: ' +
+            (DRY_RUN ? 'planned ' : '') +
+            'creates=' + made +
+            ', updates=' + changed +
+            ', reused=' + reused +
+            ', skipped=' + skipped
+        );
+
+        log(
+            DRY_RUN
+                ? 'Review output; set DRY_RUN=false to apply. ' +
+                  'Preview does not execute business-rule validation.'
+                : 'Refresh John Dave in your User Dashboard. ' +
+                  'Check SKIP lines and preserved membership dates.'
+        );
+
+    } catch (error) {
+        log('STOPPED: ' + String(error));
+
+        log(
+            DRY_RUN
+                ? 'No records written.'
+                : 'Earlier writes may remain. Created=' + made +
+                  ', updated=' + changed +
+                  '. Inspect execution history before rerunning.'
+        );
+    }
+})();
