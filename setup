@@ -1,0 +1,1094 @@
+/*
+ * 42 field definitions transcribed from your field-list photos.
+ *
+ * Run on a DEVELOPMENT instance as admin.
+ * Start with DRY_RUN = true.
+ *
+ * Run in:
+ *   Global               -> missing u_ fields
+ *   x_stmin_st_pricing    -> missing x_stmin_st_pricing_ fields
+ *
+ * Existing fields, including inherited fields, are audited
+ * and NEVER modified.
+ *
+ * This script does not import accounts, create territories,
+ * execute assignments, or place fields on forms.
+ */
+
+(function () {
+
+    var CFG = {
+
+        DRY_RUN: true,
+
+        PRICING_SCOPE: 'x_stmin_st_pricing',
+
+        /*
+         * Enter TECHNICAL TABLE NAMES, not display labels.
+         *
+         * Customer Group is NOT automatically sys_user_group.
+         * Leave blank until the correct target is confirmed.
+         */
+        REGION_TABLE: '',
+        CUSTOMER_GROUP_TABLE: '',
+
+        /*
+         * Proposed defaults for NEW fields only.
+         * Your photos do not specify maximum lengths.
+         */
+        STRING_LENGTH: 255,
+        CHOICE_LENGTH: 40,
+
+        STOP_ON_INSERT_FAILURE: true
+    };
+
+
+    /*
+     * Format:
+     *
+     * [
+     *     table,
+     *     exact column name,
+     *     column label,
+     *     source type,
+     *     reference setting
+     * ]
+     */
+
+    var FIELDS = [
+
+        [
+            'core_company',
+            'duns_number',
+            'DUNS number',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'u_region',
+            'Pricing Region',
+            'Reference',
+            'REGION'
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_wwka',
+            'WWKA',
+            'Floating Point Number',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_st_duns_number',
+            'ST DUNS Number',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_field_quality_admin',
+            'Field Quality Admin',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_customer_service_representative',
+            'Customer Service Representative',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_field_quality_engineer',
+            'Field Quality Engineer',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_b2b_contact_mail',
+            'B2B Contact Mail',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_distributor_oid',
+            'Distributor OID',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_price_assoc',
+            'Price Assoc',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_customer_group',
+            'Customer Group',
+            'Reference',
+            'CUSTOMER_GROUP'
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_sales_area',
+            'Sales Area',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_sales_manager',
+            'Sales Manager',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_create_new_request',
+            'Create New Request',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_sales_unit',
+            'Sales Unit',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_field_sales_engineer',
+            'Field Sales Engineer',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_b2b_contact_phone',
+            'B2B Contact Phone',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_b2b_contact_name',
+            'B2B Contact Name',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_proposed_sold_to',
+            'Proposed Sold To',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_legal_name',
+            'Legal Name',
+            'String',
+            ''
+        ],
+
+        /*
+         * "coustomer" follows the spelling visible in the photo.
+         * Verify the exact technical name against your workbook.
+         */
+        [
+            'customer_account',
+            'x_stmin_st_pricing_parent_coustomer_oid',
+            'Parent Customer OID',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_sales_sub_area',
+            'Sales Sub Area',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_is_channel_direct',
+            'Is Channel Direct',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_location',
+            'Location',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_display_name',
+            'Display Name',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_region_code',
+            'REGION_CODE',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_market_segment',
+            'MARKET_SEGMENT_CODE',
+            'Choice',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_parent_company_code',
+            'PARENT_COMPANY_CODE',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_updating_org_code',
+            'UPDATING_ORG_CODE',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_cust_category',
+            'CUST_CATEGORY',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_non_latin_name',
+            'NON_LATIN_NAME',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_name2',
+            'NAME2',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_name3',
+            'NAME3',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_u_name4',
+            'NAME4',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'u_prisma_account_number',
+            'Prisma account number',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'u_cmdm_level',
+            'CMDM Level',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'u_classification',
+            'Customer type',
+            'Choice',
+            ''
+        ],
+
+        [
+            'core_company',
+            'country',
+            'Country',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'status',
+            'Status',
+            'String',
+            ''
+        ],
+
+        [
+            'customer_account',
+            'x_stmin_st_pricing_currency_code',
+            'currency code',
+            'String',
+            ''
+        ],
+
+        [
+            'core_company',
+            'contact',
+            'Contact',
+            'Reference',
+            'sys_user'
+        ],
+
+        [
+            'core_company',
+            'zip',
+            'Zip / Postal code',
+            'String',
+            ''
+        ]
+    ];
+
+
+    var TYPE = {
+        'String': 'string',
+        'Reference': 'reference',
+        'Floating Point Number': 'float',
+        'Choice': 'string'
+    };
+
+
+    var counts = {
+        existing: 0,
+        conflict: 0,
+        would_create: 0,
+        created: 0,
+        deferred_scope: 0,
+        blocked: 0,
+        failed: 0,
+        not_processed: 0
+    };
+
+
+    var currentScope = String(gs.getCurrentScopeName());
+
+    var stop = false;
+
+
+    function log(status, text) {
+
+        gs.info(
+            '[ACCOUNT_SCHEMA][' +
+            status +
+            '] ' +
+            text
+        );
+    }
+
+
+    function tableExists(name) {
+
+        var table = new GlideRecord('sys_db_object');
+
+        return table.get('name', name);
+    }
+
+
+    /*
+     * Finds the field on the requested table or its ancestors.
+     *
+     * For example, a field inherited from core_company should
+     * not be created again on customer_account.
+     */
+
+    function dictionaryFor(table, element) {
+
+        var seen = {};
+
+        while (table && !seen['$' + table]) {
+
+            seen['$' + table] = true;
+
+            var dictionary = new GlideRecord('sys_dictionary');
+
+            dictionary.addQuery('name', table);
+            dictionary.addQuery('element', element);
+            dictionary.setLimit(2);
+            dictionary.query();
+
+            if (dictionary.next()) {
+
+                var result = {
+
+                    id: String(dictionary.getUniqueValue()),
+
+                    owner: table,
+
+                    type: String(
+                        dictionary.getValue('internal_type') || ''
+                    ),
+
+                    reference: String(
+                        dictionary.getValue('reference') || ''
+                    ),
+
+                    choice: String(
+                        dictionary.getValue('choice') || '0'
+                    ),
+
+                    label: String(
+                        dictionary.getValue('column_label') || ''
+                    ),
+
+                    active: String(
+                        dictionary.getValue('active') || ''
+                    )
+                };
+
+                if (dictionary.next()) {
+
+                    throw new Error(
+                        'Duplicate dictionary entries: ' +
+                        table +
+                        '.' +
+                        element
+                    );
+                }
+
+                return result;
+            }
+
+            var tableRecord = new GlideRecord('sys_db_object');
+
+            if (!tableRecord.get('name', table)) {
+
+                throw new Error(
+                    'Table metadata missing: ' + table
+                );
+            }
+
+            var parentID = tableRecord.getValue('super_class');
+
+            if (!parentID) {
+                return null;
+            }
+
+            var parent = new GlideRecord('sys_db_object');
+
+            if (!parent.get(parentID)) {
+
+                throw new Error(
+                    'Parent metadata unavailable: ' + table
+                );
+            }
+
+            table = String(parent.getValue('name'));
+        }
+
+        if (table) {
+
+            throw new Error(
+                'Cycle in table inheritance: ' + table
+            );
+        }
+
+        return null;
+    }
+
+
+    function referenceFor(field) {
+
+        if (field[4] === 'REGION') {
+            return CFG.REGION_TABLE;
+        }
+
+        if (field[4] === 'CUSTOMER_GROUP') {
+            return CFG.CUSTOMER_GROUP_TABLE;
+        }
+
+        return field[4];
+    }
+
+
+    function ownerScope(element) {
+
+        if (element.indexOf('u_') === 0) {
+            return 'global';
+        }
+
+        if (
+            element.indexOf(
+                CFG.PRICING_SCOPE + '_'
+            ) === 0
+        ) {
+            return CFG.PRICING_SCOPE;
+        }
+
+        /*
+         * Missing unprefixed system fields should be
+         * investigated rather than recreated.
+         */
+
+        return '';
+    }
+
+
+    function differences(existing, field, reference) {
+
+        var issues = [];
+
+        if (existing.type !== TYPE[field[3]]) {
+
+            issues.push(
+                'type=' +
+                existing.type +
+                ', expected=' +
+                TYPE[field[3]]
+            );
+        }
+
+        var isChoice =
+            existing.choice !== '0' &&
+            existing.choice !== '';
+
+        if (field[3] === 'Choice' && !isChoice) {
+
+            issues.push(
+                'choice list is not enabled'
+            );
+        }
+
+        if (field[3] === 'String' && isChoice) {
+
+            issues.push(
+                'existing field has choice behavior'
+            );
+        }
+
+        if (
+            field[3] === 'Reference' &&
+            reference &&
+            existing.reference !== reference
+        ) {
+
+            issues.push(
+                'reference=' +
+                existing.reference +
+                ', expected=' +
+                reference
+            );
+        }
+
+        if (
+            existing.active === 'false' ||
+            existing.active === '0'
+        ) {
+
+            issues.push(
+                'field is inactive'
+            );
+        }
+
+        return issues;
+    }
+
+
+    /*
+     * Initial checks.
+     */
+
+    if (!gs.hasRole('admin')) {
+
+        log(
+            'STOP',
+            'Run as an administrator in development.'
+        );
+
+        return;
+    }
+
+    if (
+        !tableExists('customer_account') ||
+        !tableExists('core_company')
+    ) {
+
+        log(
+            'STOP',
+            'Required customer_account/core_company table ' +
+            'is unavailable.'
+        );
+
+        return;
+    }
+
+    log(
+        'START',
+        'scope=' +
+        currentScope +
+        ', dry_run=' +
+        CFG.DRY_RUN +
+        ', definitions=' +
+        FIELDS.length
+    );
+
+
+    /*
+     * Process each field.
+     */
+
+    for (var i = 0; i < FIELDS.length; i++) {
+
+        if (stop) {
+
+            counts.not_processed++;
+
+            continue;
+        }
+
+        var field = FIELDS[i];
+
+        var key = field[0] + '.' + field[1];
+
+        try {
+
+            var reference = referenceFor(field);
+
+            var existing = dictionaryFor(
+                field[0],
+                field[1]
+            );
+
+
+            /*
+             * Existing field: audit it without changing it.
+             */
+
+            if (existing) {
+
+                var issues = differences(
+                    existing,
+                    field,
+                    reference
+                );
+
+                if (issues.length) {
+
+                    counts.conflict++;
+
+                    log(
+                        'CONFLICT',
+                        key +
+                        ': ' +
+                        issues.join('; ') +
+                        '. Preserved unchanged.'
+                    );
+
+                } else {
+
+                    counts.existing++;
+
+                    log(
+                        'EXISTS',
+                        key +
+                        ' (defined on ' +
+                        existing.owner +
+                        ', label=' +
+                        existing.label +
+                        ')'
+                    );
+                }
+
+                if (field[3] === 'Reference') {
+
+                    log(
+                        'REFERENCE',
+                        key +
+                        ' -> ' +
+                        existing.reference +
+                        (
+                            reference
+                                ? ''
+                                : ' [verify this target against the workbook]'
+                        )
+                    );
+                }
+
+                if (field[3] === 'Choice') {
+
+                    log(
+                        'CHOICES',
+                        key +
+                        ': verify stored values/labels ' +
+                        'before data import.'
+                    );
+                }
+
+                continue;
+            }
+
+
+            /*
+             * Extra check for an effective/inherited field
+             * whose dictionary owner was not resolved.
+             */
+
+            var probe = new GlideRecord(field[0]);
+
+            if (probe.isValidField(field[1])) {
+
+                counts.blocked++;
+
+                log(
+                    'BLOCKED',
+                    key +
+                    ': effective field exists but dictionary ' +
+                    'owner could not be resolved.'
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Check the required application scope.
+             */
+
+            var requiredScope = ownerScope(field[1]);
+
+            if (!requiredScope) {
+
+                counts.blocked++;
+
+                log(
+                    'BLOCKED',
+                    key +
+                    ': missing unprefixed field; verify ' +
+                    'application/schema, do not invent a replacement.'
+                );
+
+                continue;
+            }
+
+            if (currentScope !== requiredScope) {
+
+                counts.deferred_scope++;
+
+                log(
+                    'DEFERRED_SCOPE',
+                    key +
+                    ': rerun in ' +
+                    requiredScope
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Reference fields require a real target table.
+             */
+
+            if (
+                field[3] === 'Reference' &&
+                (
+                    !reference ||
+                    !tableExists(reference)
+                )
+            ) {
+
+                counts.blocked++;
+
+                log(
+                    'BLOCKED',
+                    key +
+                    ': configure an existing technical ' +
+                    'reference table for ' +
+                    field[4]
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Confirm the internal field type exists.
+             */
+
+            var typeRecord = new GlideRecord('sys_glide_object');
+
+            if (
+                !typeRecord.get(
+                    'name',
+                    TYPE[field[3]]
+                )
+            ) {
+
+                throw new Error(
+                    'Field type unavailable: ' +
+                    TYPE[field[3]]
+                );
+            }
+
+
+            /*
+             * Dry run: print the proposed creation only.
+             */
+
+            if (CFG.DRY_RUN) {
+
+                counts.would_create++;
+
+                log(
+                    'WOULD_CREATE',
+                    key +
+                    ' | ' +
+                    field[2] +
+                    ' | ' +
+                    field[3] +
+                    (
+                        reference
+                            ? ' -> ' + reference
+                            : ''
+                    )
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Create the missing dictionary entry.
+             * Normal business rules and scope enforcement
+             * remain enabled.
+             */
+
+            var dictionary = new GlideRecord('sys_dictionary');
+
+            dictionary.initialize();
+
+            dictionary.setValue(
+                'name',
+                field[0]
+            );
+
+            dictionary.setValue(
+                'element',
+                field[1]
+            );
+
+            dictionary.setValue(
+                'column_label',
+                field[2]
+            );
+
+            dictionary.setValue(
+                'internal_type',
+                TYPE[field[3]]
+            );
+
+            dictionary.setValue(
+                'active',
+                true
+            );
+
+            dictionary.setValue(
+                'mandatory',
+                false
+            );
+
+            if (TYPE[field[3]] === 'string') {
+
+                dictionary.setValue(
+                    'max_length',
+                    field[3] === 'Choice'
+                        ? CFG.CHOICE_LENGTH
+                        : CFG.STRING_LENGTH
+                );
+            }
+
+            if (field[3] === 'Choice') {
+
+                /*
+                 * Dropdown with None.
+                 * No business choice options are invented.
+                 */
+
+                dictionary.setValue(
+                    'choice',
+                    1
+                );
+            }
+
+            if (field[3] === 'Reference') {
+
+                dictionary.setValue(
+                    'reference',
+                    reference
+                );
+            }
+
+            var id = dictionary.insert();
+
+            if (!id) {
+
+                throw new Error(
+                    dictionary.getLastErrorMessage() ||
+                    'Dictionary insert returned no sys_id'
+                );
+            }
+
+
+            /*
+             * Verify the saved dictionary entry.
+             */
+
+            var saved = new GlideRecord('sys_dictionary');
+
+            if (
+                !saved.get(id) ||
+                String(saved.getValue('name')) !== field[0] ||
+                String(saved.getValue('element')) !== field[1]
+            ) {
+
+                throw new Error(
+                    'Inserted dictionary could not be verified; ' +
+                    'inspect sys_id=' +
+                    id
+                );
+            }
+
+            if (
+                String(
+                    saved.getValue('internal_type')
+                ) !== TYPE[field[3]] ||
+
+                (
+                    field[3] === 'Reference' &&
+                    String(
+                        saved.getValue('reference')
+                    ) !== reference
+                ) ||
+
+                (
+                    field[3] === 'Choice' &&
+                    String(
+                        saved.getValue('choice')
+                    ) !== '1'
+                )
+            ) {
+
+                throw new Error(
+                    'Inserted definition differs from request; ' +
+                    'inspect sys_id=' +
+                    id
+                );
+            }
+
+            counts.created++;
+
+            log(
+                'CREATED',
+                key +
+                ' | dictionary_sys_id=' +
+                id
+            );
+
+            if (field[3] === 'Choice') {
+
+                log(
+                    'CHOICES',
+                    key +
+                    ': field created; business choice values ' +
+                    'still required.'
+                );
+            }
+
+        } catch (error) {
+
+            counts.failed++;
+
+            log(
+                'FAILED',
+                key +
+                ': ' +
+                String(error.message || error)
+            );
+
+            if (CFG.STOP_ON_INSERT_FAILURE) {
+                stop = true;
+            }
+        }
+    }
+
+
+    /*
+     * Final summary.
+     */
+
+    log(
+        'SUMMARY',
+        JSON.stringify(counts)
+    );
+
+    log(
+        'NEXT',
+        'Resolve conflicts/blocked items and other-scope fields. ' +
+        'Rerun in a new transaction to verify actual field availability.'
+    );
+
+    log(
+        'NOTE',
+        'Dictionary creation does not place fields on forms, ' +
+        'define business choice options, or import records.'
+    );
+
+}());
